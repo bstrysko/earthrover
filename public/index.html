@@ -1,5 +1,6 @@
 <html>
 	<body>
+		<script type="text/javascript" src="js/gamepad.js"></script>
 		<script type="text/javascript">
 			window.onload = function()
 			{
@@ -16,9 +17,19 @@
 					message = JSON.parse(message);
 					console.log(message);
 				}
+
+				if(!Gamepad.init())
+				{
+					alert("Xbox Controller not Supported");
+					console.log("Xbox Controller not Supported");
+					return;
+				}
+
+				Gamepad.ondata = function(data)
+				{
+					ws.send(data.joystick[0].X + ":" + data.joystick[0].Y + ":" + data.joystick[1].X + ":" + data.joystick[1].Y);
+				}
 			}
 		</script>
-	
 	</body>
-
 </html>
