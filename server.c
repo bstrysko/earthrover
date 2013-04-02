@@ -11,6 +11,8 @@
 #include <signal.h>
 
 #include <libwebsockets.h>
+#include <wiringPi.h>
+#include <softPwm.h>
 
 static int close_testing;
 int max_poll_elements;
@@ -19,6 +21,86 @@ struct pollfd *pollfds;
 int *fd_lookup;
 int count_pollfds;
 int force_exit = 0;
+
+#define LEFT_MOTOR_FORWARD 0
+#define LEFT_MOTOR_BACKWARD 3
+
+#define RIGHT_MOTOR_FORWARD 1
+#define RIGHT_MOTOR_BACKWARD 4
+
+void leftMotor(int value);
+void rightMotor(int value);
+
+void straight(int value);
+
+void init_pins()
+{
+	if(wiringPiSetup() == -1)
+	{
+		printf("Could not initialize WiringPI");
+		exit(1);
+	}
+
+	/*
+	 * Set motor pins to outputs
+	 */
+	/*
+	 * Left Motors
+	 */
+	softPwmCreate(LEFT_MOTOR_FORWARD,0,100);
+	softPwmCreate(LEFT_MOTOR_BACKWARD,0,100);
+
+
+	/*
+	 * Right Motors
+	 */
+	softPwmCreate(RIGHT_MOTOR_FORWARD,0,100);
+	softPwmCreate(RIGHT_MOTOR_BACKWARD,0,100);
+
+	/*
+	 * Make motor pins low on start
+	 */
+	leftMotor(0);
+	rightMotor(0);
+}
+
+void leftMotor(int value)
+{
+	int forward_value = 0;
+	int backward_value = 0;
+	
+	if(value > 0)
+	{
+		forward_value = value;
+	}
+	else if(value < 0)
+	{
+		backward_value = -value;
+	}
+
+	softPwmWrite(LEFT_MOTOR_FORWARD,forward_value);
+	softPwmWrite(LEFT_MOTOR_BACKWARD,backward_value);
+}
+
+void rightMotor(int value)
+{
+	int forward_value = 0;
+	int backward_value = 0;
+	
+	if(value > 0)
+	{
+		forward_value = value;
+	}
+	else if(value < 0)
+	{
+		backward_value = -value;
+	}
+
+	softPwmWrite(RIGHT_MOTOR_FORWARD,forward_value);
+	softPwmWrite(RIGHT_MOTOR_BACKWARD,backward_value);
+}
+
+
 
 /*
  * This demo server shows how to use libwebsockets for one or more
@@ -74,7 +156,7 @@ static int callback_http(struct libwebsocket_context *context,
 	switch (reason) {
 	case LWS_CALLBACK_HTTP:
 		
-		if (libwebsockets_serve_http_file(context, wsi,"index.html","text/html"))
+		if (libwebsockets_serve_http_file(context, wsi,"public/index.html","text/html"))
 			return -1; /* through completion or error, close the socket */
 
 		/*
@@ -196,30 +278,41 @@ callback_dumb_increment(struct libwebsocket_context *context,
 	switch (reason) {
 
 	case LWS_CALLBACK_ESTABLISHED:
-		lwsl_info("callback_dumb_increment: "
+		printf("callback_dumb_increment: "
 						 "LWS_CALLBACK_ESTABLISHED\n");
-		pss->number = 0;
 		break;
 
 	case LWS_CALLBACK_SERVER_WRITEABLE:
-		n = sprintf((char *)p, "%d", pss->number++);
-		m = libwebsocket_write(wsi, p, n, LWS_WRITE_TEXT);
-		if (m < n) {
-			lwsl_err("ERROR %d writing to di socket\n", n);
-			return -1;
-		}
-		if (close_testing && pss->number == 50) {
-			lwsl_info("close tesing limit, closing\n");
-			return -1;
-		}
 		break;
 
 	case LWS_CALLBACK_RECEIVE:
-//		fprintf(stderr, "rx %d\n", (int)len);
-		if (len < 6)
-			break;
-		if (strcmp((const char *)in, "reset\n") == 0)
-			pss->number = 0;
+		printf("LWS_CALLBACK_RECEIVE");
+		printf("rx %d\n", (int)len);
+	 	
+		//unsigned char *buf = (unsigned char*) malloc(LWS_SEND_BUFFER_PRE_PADDING + len + LWS_SEND_BUFFER_POST_PADDING);
+           
+            	//int i;
+           
+            	// pointer to `void *in` holds the incomming request
+            	// we're just going to put it in reverse order and put it in `buf` with
+            	// correct offset. `len` holds length of the request.
+           
+		printf("\n%s\n",(char*)in);
+
+		double x1,y1,x2,y2;
+		sscanf((char*)in,"%lf:%lf:%lf:%lf",&x1,&y1,&x2,&y2);
+
+		leftMotor((int)(-y1)*100);
+		rightMotor((int)(-y2)*100);
+
+//		printf("%d,%d,%d,%d",x1,y1,x2,y2);
+            	// log what we recieved and what we're going to send as a response.
+            	// that disco syntax `%.*s` is used to print just a part of our buffer
+            	// http://stackoverflow.com/questions/5189071/print-part-of-char-array
+            	//printf("received data: %s, replying: %.*s\n", (char *) in, (int) len,buf + LWS_SEND_BUFFER_PRE_PADDING);	
+
+		//free(buf);
+
 		break;
 	/*
 	 * this just demonstrates how to use the protocol filter. If you won't
@@ -239,24 +332,6 @@ callback_dumb_increment(struct libwebsocket_context *context,
 	return 0;
 }
 
-
-/* lws-mirror_protocol */
-
-#define MAX_MESSAGE_QUEUE 32
-
-struct per_session_data__lws_mirror {
-	struct libwebsocket *wsi;
-	int ringbuffer_tail;
-};
-
-struct a_message {
-	void *payload;
-	size_t len;
-};
-
-static struct a_message ringbuffer[MAX_MESSAGE_QUEUE];
-static int ringbuffer_head;
-
 /* list of supported protocols and callbacks */
 
 static struct libwebsocket_protocols protocols[] = {
@@ -269,16 +344,18 @@ static struct libwebsocket_protocols protocols[] = {
 		0,			/* max frame size / rx buffer */
 	},
 	{
-		"dumb-increment-protocol",
+		"earthrover",
 		callback_dumb_increment,
 		sizeof(struct per_session_data__dumb_increment),
-		10,
+		0,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
 };
 
 void sighandler(int sig)
 {
+	leftMotor(0);
+	rightMotor(0);
 	force_exit = 1;
 }
 
@@ -306,9 +383,7 @@ int main(int argc, char **argv)
 	struct lws_context_creation_info info;
 
 	int debug_level = 7;
-#ifndef LWS_NO_DAEMONIZE
 	int daemonize = 0;
-#endif
 
 	memset(&info, 0, sizeof info);
 	info.port = 7681;
@@ -318,12 +393,10 @@ int main(int argc, char **argv)
 		if (n < 0)
 			continue;
 		switch (n) {
-#ifndef LWS_NO_DAEMONIZE
 		case 'D':
 			daemonize = 1;
 			syslog_options &= ~LOG_PERROR;
 			break;
-#endif
 		case 'd':
 			debug_level = atoi(optarg);
 			break;
@@ -349,6 +422,8 @@ int main(int argc, char **argv)
 			exit(1);
 		}
 	}
+
+	init_pins();
 
 	/* 
 	 * normally lock path would be /var/lock/lwsts or similar, to
@@ -389,21 +464,6 @@ int main(int argc, char **argv)
 
 	n = 0;
 	while (n >= 0 && !force_exit) {
-		struct timeval tv;
-
-		gettimeofday(&tv, NULL);
-
-		/*
-		 * This provokes the LWS_CALLBACK_SERVER_WRITEABLE for every
-		 * live websocket connection using the DUMB_INCREMENT protocol,
-		 * as soon as it can take more packets (usually immediately)
-		 */
-
-		if (((unsigned int)tv.tv_usec - oldus) > 50000) {
-			libwebsocket_callback_on_writable_all_protocol(&protocols[PROTOCOL_DUMB_INCREMENT]);
-			oldus = tv.tv_usec;
-		}
-
 		/*
 		 * If libwebsockets sockets are all we care about,
 		 * you can use this api which takes care of the poll()
@@ -414,7 +474,6 @@ int main(int argc, char **argv)
 		 */
 
 		n = libwebsocket_service(context, 50);
-		printf("Hello World");
 	}
 
 	libwebsocket_context_destroy(context);
