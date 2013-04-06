@@ -153,19 +153,62 @@ static int callback_http(struct libwebsocket_context *context,
 	struct stat stat_buf;
 	struct per_session_data__http *pss = (struct per_session_data__http *)user;
 
-	switch (reason) {
-	case LWS_CALLBACK_HTTP:
-		
-		if (libwebsockets_serve_http_file(context, wsi,"public/index.html","text/html"))
-			return -1; /* through completion or error, close the socket */
+	switch (reason) 
+	{
+		case LWS_CALLBACK_HTTP:
+		{
+			if(strcmp((char*)in,"/") == 0)
+			{
+				strcat((char*)in,"index.html");
+			}
 
-		/*
-		 * notice that the sending of the file completes asynchronously,
-		 * we'll get a LWS_CALLBACK_HTTP_FILE_COMPLETION callback when
-		 * it's done
-		 */
+			/*
+		 	 * Determine mime type
+		 	 */
+			char *extension = strrchr((char*)in, '.');
+			char *mime;
+                  
+			// choose mime type based on the file extension
+			if(extension == NULL) 
+			{
+                        	mime = "text/plain";
+                    	} 
+			else if(strcmp(extension, ".png") == 0) 
+			{
+                        	mime = "image/png";
+			} 
+			else if(strcmp(extension, ".jpg") == 0) 
+			{
+                        	mime = "image/jpg";
+			} 
+			else if(strcmp(extension, ".gif") == 0) 
+			{
+                        	mime = "image/gif";
+			} 
+			else if(strcmp(extension, ".html") == 0) 
+			{
+				mime = "text/html";
+                    	} 
+			else if (strcmp(extension, ".css") == 0)
+			{
+				mime = "text/css";
+			}
+			else
+			{
+				mime = "text/plain";
+			}
 
-		break;
+			char buffer[256];
+			strcpy(buffer,"public");
+			strcat(buffer,(char*)in);
+
+			if(libwebsockets_serve_http_file(context, wsi, buffer, mime))
+			{
+				return -1; /* through completion or error, close the socket */
+			}
+			
+			break;
+		}
 
 	case LWS_CALLBACK_HTTP_FILE_COMPLETION:
 		/* kill the connection after we sent one file */
@@ -207,8 +250,7 @@ bail:
  * content
  */
 
-static void
-dump_handshake_info(struct libwebsocket *wsi)
+static void dump_handshake_info(struct libwebsocket *wsi)
 {
 	int n;
 	static const char *token_names[WSI_TOKEN_COUNT] = {
@@ -249,84 +291,52 @@ dump_handshake_info(struct libwebsocket *wsi)
 	}
 }
 
-/* dumb_increment protocol */
-
-/*
- * one of these is auto-created for each connection and a pointer to the
- * appropriate instance is passed to the callback in the user parameter
- *
- * for this example protocol we use it to individualize the count for each
- * connection.
- */
-
-struct per_session_data__dumb_increment {
-	int number;
-};
-
-static int
-callback_dumb_increment(struct libwebsocket_context *context,
-			struct libwebsocket *wsi,
-			enum libwebsocket_callback_reasons reason,
-					       void *user, void *in, size_t len)
+static int callback_earthrover(struct libwebsocket_context *context, struct libwebsocket *wsi, enum libwebsocket_callback_reasons reason, void *user, void *in, size_t len)
 {
 	int n, m;
-	unsigned char buf[LWS_SEND_BUFFER_PRE_PADDING + 512 +
-						  LWS_SEND_BUFFER_POST_PADDING];
-	unsigned char *p = &buf[LWS_SEND_BUFFER_PRE_PADDING];
-	struct per_session_data__dumb_increment *pss = (struct per_session_data__dumb_increment *)user;
+	
+	switch (reason) 
+	{
+		case LWS_CALLBACK_ESTABLISHED:
+		{
+			char name[256];
+			char ip[256];
 
-	switch (reason) {
+			int fd = libwebsocket_get_socket_fd(wsi);
+			libwebsockets_get_peer_addresses(context,wsi,fd,name,256,ip,256);
 
-	case LWS_CALLBACK_ESTABLISHED:
-		printf("callback_dumb_increment: "
-						 "LWS_CALLBACK_ESTABLISHED\n");
-		break;
+			printf("Websocket Client Connected %s (%s) \n",name,ip);
+			break;
+		}
+		case LWS_CALLBACK_SERVER_WRITEABLE:
+		{
+			break;
+		}
+		case LWS_CALLBACK_RECEIVE:
+		{
+			double x1,y1,x2,y2;
+			sscanf((char*)in,"%lf:%lf:%lf:%lf",&x1,&y1,&x2,&y2);
 
-	case LWS_CALLBACK_SERVER_WRITEABLE:
-		break;
+			if(abs(y1) < 0.05)
+			{
+				y1 = 0;
+			}
 
-	case LWS_CALLBACK_RECEIVE:
-		printf("LWS_CALLBACK_RECEIVE");
-		printf("rx %d\n", (int)len);
-	 	
-		//unsigned char *buf = (unsigned char*) malloc(LWS_SEND_BUFFER_PRE_PADDING + len + LWS_SEND_BUFFER_POST_PADDING);
-           
-            	//int i;
-           
-            	// pointer to `void *in` holds the incomming request
-            	// we're just going to put it in reverse order and put it in `buf` with
-            	// correct offset. `len` holds length of the request.
-           
-		printf("\n%s\n",(char*)in);
+			if(abs(y2) < 0.05)
+			{
+				y2 = 0;
+			}
 
-		double x1,y1,x2,y2;
-		sscanf((char*)in,"%lf:%lf:%lf:%lf",&x1,&y1,&x2,&y2);
+			leftMotor((int)(-y1*100));
+			rightMotor((int)(-y2*100));
 
-		leftMotor((int)(-y1)*100);
-		rightMotor((int)(-y2)*100);
-
-//		printf("%d,%d,%d,%d",x1,y1,x2,y2);
-            	// log what we recieved and what we're going to send as a response.
-            	// that disco syntax `%.*s` is used to print just a part of our buffer
-            	// http://stackoverflow.com/questions/5189071/print-part-of-char-array
-            	//printf("received data: %s, replying: %.*s\n", (char *) in, (int) len,buf + LWS_SEND_BUFFER_PRE_PADDING);	
-
-		//free(buf);
-
-		break;
-	/*
-	 * this just demonstrates how to use the protocol filter. If you won't
-	 * study and reject connections based on header content, you don't need
-	 * to handle this callback
-	 */
-
-	case LWS_CALLBACK_FILTER_PROTOCOL_CONNECTION:
-		dump_handshake_info(wsi);
-		/* you could return non-zero here and kill the connection */
-		break;
-
-	default:
-		break;
+			printf("%lf,%lf,%lf,%lf\n",x1,y1,x2,y2);
+			break;
+		}
+		default:
+		{
+			break;
+		}
 	}
 
 	return 0;
@@ -345,8 +355,8 @@ static struct libwebsocket_protocols protocols[] = {
 	},
 	{
 		"earthrover",
-		callback_dumb_increment,
-		sizeof(struct per_session_data__dumb_increment),
+		callback_earthrover,
+		0,
 		0,
 	},
 	{ NULL, NULL, 0, 0 } /* terminator */
