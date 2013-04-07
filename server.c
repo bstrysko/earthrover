@@ -189,9 +189,13 @@ static int callback_http(struct libwebsocket_context *context,
 			{
 				mime = "text/html";
                     	} 
-			else if (strcmp(extension, ".css") == 0)
+			else if(strcmp(extension, ".css") == 0)
 			{
 				mime = "text/css";
+			}
+			else if(strcmp(extension,".js") == 0)
+			{
+				mime = "application/javascript";
 			}
 			else
 			{
