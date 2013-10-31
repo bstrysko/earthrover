@@ -1,34 +1,27 @@
-var child_process = require('child_process');
-var exec = child_process.exec;
+var piBlaster = require("pi-blaster.js");
 
 var Motor = {
-  dev : '/dev/pi-blaster',
   LEFT_FORWARD : 1, 
   LEFT_BACKWARD : 4,
   RIGHT_FORWARD : 2,
   RIGHT_BACKWARD : 5, 
 };
 
-function setPWM(channel, freq){
-  exec("echo '"+channel+"="+freq+"' > " + Motor.dev,
-    function(error,stdout,stderror){}
-  )
-}
 
 function setLeftForward(freq){
-  setPWM(Motor.LEFT_FORWARD,freq);
+  piBlaster.setPwm(Motor.LEFT_FORWARD,freq);
 }
 
 function setLeftBackward(freq){
-  setPWM(Motor.LEFT_BACKWARD,freq);
+  piBlaster.setPwm(Motor.LEFT_BACKWARD,freq);
 }
 
 function setRightForward(freq){
-  setPWM(Motor.RIGHT_FORWARD,freq);
+  piBlaster.setPwm(Motor.RIGHT_FORWARD,freq);
 }
 
 function setRightBackward(freq){
-  setPWM(Motor.RIGHT_BACKWARD,freq);
+  piBlaster.setPwm(Motor.RIGHT_BACKWARD,freq);
 }
 
 function boundCheck(v){
