@@ -1,0 +1,53 @@
+<html>
+  <head>
+    <script src="gamepad.js"></script>
+  </head>
+  <body>
+    <pre id="gamepad_json"></pre>
+
+    <script type="text/javascript">
+      var ws;      
+
+      window.onload = function(){
+	ws = new WebSocket("ws://"+location.host+":8080");
+    
+	ws.onopen = function() {
+	  Gamepad.init(function(data){
+	    document.getElementById('gamepad_json').innerHTML =
+	      JSON.stringify(data,undefined,2);
+	    
+	    var left = -data['joystick'][0]['Y'];
+	    var right = -data['joystick'][1]['Y'];
+
+	    if(Math.abs(left) < 0.2){
+	      left = 0.0;
+	    }
+
+	    if(Math.abs(right) < 0.2){
+	      right = 0.0;
+	    }
+
+	    var message = {
+	      type: 'drive',
+	      args: {
+		left: left,
+		right: right,
+	      }
+	    }
+
+	    ws.send(JSON.stringify(message));
+	  });
+	}
+
+	ws.onmessage = function(message){
+	  //message = JSON.parse(message);
+	  //console.log(message);
+	}
+
+	ws.onclose = function(){
+
+	}
+      }
+    </script>
+  </body>
+</html>

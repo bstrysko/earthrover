@@ -5,6 +5,8 @@ var Motor = {
   LEFT_BACKWARD : 4,
   RIGHT_FORWARD : 2,
   RIGHT_BACKWARD : 5, 
+  left_value : 0.0,
+  right_value : 0.0,
 };
 
 
@@ -34,8 +36,17 @@ function boundCheck(v){
   return v;
 }
 
+Motor.getStatus = function(){
+  return {
+    left : Motor.left_value,
+    right : Motor.right_value,
+  }
+}
+
 Motor.setLeft = function(v){
   v = boundCheck(v);
+
+  Motor.left_value = v;
 
   if(v > 0){
     setLeftForward(v);
@@ -52,6 +63,8 @@ Motor.setLeft = function(v){
 Motor.setRight = function(v){
   v = boundCheck(v);
 
+  Motor.right_value = v;
+
   if(v > 0){
     setRightForward(v);
     setRightBackward(0);
@@ -63,7 +76,5 @@ Motor.setRight = function(v){
     setRightBackward(0);
   }
 }
-
-
 
 module.exports = Motor;
