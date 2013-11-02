@@ -3,12 +3,20 @@
     <script src="gamepad.js"></script>
   </head>
   <body>
+    <img id="frame"></img>
     <pre id="gamepad_json"></pre>
 
     <script type="text/javascript">
       var ws;      
 
       window.onload = function(){
+	var frame_url = 'http://'+ location.host + "/api/camera";
+
+	setInterval(function(){
+	  document.getElementById('frame').src = 
+	    frame_url+"?id=" + new Date().getTime();
+	},1000);
+
 	ws = new WebSocket("ws://"+location.host+":8080");
     
 	ws.onopen = function() {

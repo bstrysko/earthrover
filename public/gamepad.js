@@ -41,7 +41,7 @@ Gamepad.init = function(callback) {
   if(!gamepadSupportAvailable) {
     return false;
   } else {
-    window.setInterval(this.update,100);
+    window.setInterval(this.update,500);
     return true;
   }
 }

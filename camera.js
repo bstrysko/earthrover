@@ -9,12 +9,12 @@ var Camera = {
 
 Camera.init = function(device, freq){
   device = device || "/dev/video0";
-  freq = freq || 2;
+  freq = freq || 1;
 
   Camera.camelot = new Camelot( {
     'verbose': false,
     'device' : '/dev/video0',
-    'resolution' : '352x288',
+    'resolution' : '176x144',
     'title' : '',
     'greyscale' : true,
   //  'rotate' : '180',
@@ -40,6 +40,7 @@ Camera.init = function(device, freq){
   Camera.camelot.grab({
     'frequency' : freq,
   });
+
 }
 
 Camera.registerFrameHandler = function(f){
